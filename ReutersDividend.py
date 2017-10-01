@@ -1,32 +1,37 @@
 # -*- coding: utf-8 -*-
 
-import urllib3
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 from requests import get
 import csv
-import google
 
 # Take ticker, return url for company-page
 def getURLforPage(ticker):
     url = "http://www.reuters.com/finance/stocks/lookup?searchType=any&comSortBy=marketcap&sortBy=&dateRange=&search=" + ticker
     response = get(url)
     search_soup = BeautifulSoup(response.text, 'html.parser')
-    partURL = search_soup.find('tr', class_='stripe').get('onclick')[17:-1]
-    return ("http://www.reuters.com"+partURL)
-
+    partURLs = search_soup.find_all('tr', class_='stripe', attrs ={'onclick'})
+    for url in partURLs:
+        url = url.get('onclick')[17:-1]
+        if (ticker.replace(" ", "")+'.CO') in url:
+            return ('http://www.reuters.com'+url)
+        else: 
+            return ('Error')
     
 # Take stockticker, return dividend
 def findDividend(ticker):
     url = getURLforPage(ticker)
-    response = get(url)
-    html_soup = BeautifulSoup(response.text, 'html.parser')
+    if url == 'Error':
+        return ('Error')
+    else:
+        response = get(url)
+        html_soup = BeautifulSoup(response.text, 'html.parser')
     
-    keywords = ['Yield']
-    for tr in html_soup.find_all('tr'):
-        string = tr.get_text()
-        if any(word in string for word in keywords):
-            return(string);
+        keywords = ['Yield']
+        for tr in html_soup.find_all('tr'):
+            string = tr.get_text()
+            if any(word in string for word in keywords):
+                return(string);
 
 
 stockurl = "http://www.nasdaqomxnordic.com/shares/listed-companies/copenhagen"
@@ -48,13 +53,22 @@ for dataset in datasets:
         if field[0] == 'Name':
             companyname = field[1]
         if field[0] == 'Symbol': 
-            #print('finding for '+ field[1])
+            print(companyname + ' : ' + field[1])
             yield_dict[companyname] = findDividend(field[1])
             
-for key in yield_dict:
-    print( key, yield_dict[key]) 
-                
-       # print ("{0:<16}: {1}".format(field[0], field[1]))
+i = 0 
+j = 0
+w = csv.writer(open("output.csv", "w"))
+for key, val in yield_dict.items():
+    if '--' in yield_dict[key]:
+        i = i+1
+    else:
+        j = j+1
+    w.writerow([key, val])
+
+print(i , ' missing')
+print(j , ' found')
+print(i/(i+j)*100,'% completion')
 
 
 
